@@ -39,11 +39,9 @@ And here are the various steps:
 5. Run the command `touch /home/lava/printer_data/extended/variables.cfg && chown lava:lava /home/lava/printer_data/extended/variables.cfg`. This command will create a file and assign user/group as lava:lava, this file is used to store spool data and allow it to persist between reboots.
 6. Save the `05_spoolman.cfg` file to `/home/lava/printer_data/config/extended/moonraker` and be sure to edit the spoolman url to match your setup. This tells moonraker where the spoolamn service is located.
 7. Modify the machine gcode to prevent it from changing toolhead assignments outside of the script.
-   - Click the pencil icon next to the printer name
-     <img src="https://uploads.namegoeshere.net/u/I9shpf.png">
+   - Click the pencil icon next to the printer name <img src="https://uploads.namegoeshere.net/u/I9shpf.png">
    - Click the `Machine G-code` tab and then inside the `Machine start G-code` block scroll down to the second block of text.
-   - Below the `T{initial_extruder}` line add `START_SPOOLMAN_TRACKING`, this will invoke the `START_SPOOLMAN_TRACKING` gcode macro from the custom gcode block we created in Step 1 when the first extruder is intiated for a print.
-     <img src="https://uploads.namegoeshere.net/u/IVaxYF.png">
+   - Below the `T{initial_extruder}` line add `START_SPOOLMAN_TRACKING`, this will invoke the `START_SPOOLMAN_TRACKING` gcode macro from the custom gcode block we created in Step 1 when the first extruder is intiated for a print. <img src="https://uploads.namegoeshere.net/u/IVaxYF.png">
   - Scroll down to the `Change filament G-code` block and look for a line that says `"USE_CHANNEL CHANNEL=" + next_extruder + "`
   - Delete the `"USE_CHANNEL CHANNEL=" + next_extruder + "` line and the line immediately below it (two lines highlighted in the screenshot).
      <img serc="https://uploads.namegoeshere.net/u/F76xMC.png">
