@@ -1,7 +1,6 @@
-With U1 extended firmware offering the ability to use nfc tags with the Openspool protocol, I wanted to find a way to automatically track filament usage without having to manually set spools or scan QR codes.
+With U1 extended firmware offering the ability to use nfc tags with the Openspool protocol, I wanted to find a way to automatically track filament usage without having to manually set spools or scan QR codes. This setup works by introducing a simple mapping layer between toolheads and spool IDs, then using that mapping to control Spoolman automatically.
 
-This setup works by introducing a simple mapping layer between toolheads and spool IDs, then using that mapping to control Spoolman automatically.
-
+SUMMARY
 Each toolhead is associated with a fixed channel (e.g., extruder → channel 0, extruder1 → channel 1, etc.). Instead of attaching spool data directly to the toolhead or UI, each channel stores a spool ID in a persistent variable.
 
 When a spool is assigned to a channel (either manually or via NFC), the system:
