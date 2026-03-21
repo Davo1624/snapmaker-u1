@@ -47,6 +47,6 @@ And here are the various steps:
 8. Save the new machine profile. NOTE: you will have to use this profile for the script to work.
 9. Save the `start_nfc_spool.sh` file to `/home/lava/printer_data/config/extended`
 10. Run the command `chmod +x /home/lava/printer_data/config/extended/start_nfc_spool.sh` to make the script executable.
-11. To start the script run the command `sh //home/lava/printer_data/config/extended/start_nfc_spool.sh &`
+11. To start the script run the command `sh /home/lava/printer_data/config/extended/start_nfc_spool.sh &`
 12. Check the log file to confirm the script is running: `tail -f /home/lava/printer_data/logs/nfc_spool_reader.log`
 13. In fluidd ui click the `Console` tab and run the command `START_SPOOLMAN_TRACKING` to clear any existing spools and read the nfc tags of any loaded spools followed by `SHOW_SPOOL_STATE` to confirm which spools are conisdered "loaded" by the script.
