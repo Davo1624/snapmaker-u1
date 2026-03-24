@@ -37,7 +37,7 @@ And here are the various steps:
 2. Restart klipper service from fluidd ui System tab.
 3. Save the `nfc_spool_reader.py` file to `/home/lava/printer_data/config/extended`. This is the python script that syncs the active toolhead (and thus filament usage) to spoolman.
 4. Run the command `chmod +x /home/lava/printer_data/config/extended/nfc_spool_reader.py` to make the script executable.
-5. Run the command `touch /home/lava/printer_data/extended/variables.cfg && chown lava:lava /home/lava/printer_data/extended/variables.cfg`. This command will create a file and assign user/group as lava:lava, this file is used to store spool data and allow it to persist between reboots.
+5. Run the command `touch /home/lava/printer_data/config/extended/variables.cfg && chown lava:lava /home/lava/printer_data/config/extended/variables.cfg`. This command will create a file and assign user/group as lava:lava, this file is used to store spool data and allow it to persist between reboots.
 6. Save the `05_spoolman.cfg` file to `/home/lava/printer_data/config/extended/moonraker` and be sure to edit the spoolman url to match your setup. This tells moonraker where the spoolamn service is located.
 7. Modify the machine gcode to prevent it from changing toolhead assignments outside of the script.
    - Click the pencil icon next to the printer name <img src="https://uploads.namegoeshere.net/u/I9shpf.png">
