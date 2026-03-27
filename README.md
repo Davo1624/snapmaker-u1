@@ -41,8 +41,8 @@ And here are the various steps:
 6. Save the `05_spoolman.cfg` file to `/home/lava/printer_data/config/extended/moonraker` and be sure to edit the spoolman url to match your setup. This tells moonraker where the spoolamn service is located.
 7. Modify the machine gcode to prevent it from changing toolhead assignments outside of the script.
    - Click the pencil icon next to the printer name <img src="https://uploads.namegoeshere.net/u/I9shpf.png">
-   - Click the `Machine G-code` tab and then inside the `Machine start G-code` block scroll down to the second block of text.
-   - Below the `T{initial_extruder}` line add `START_SPOOLMAN_TRACKING`, this will invoke the `START_SPOOLMAN_TRACKING` gcode macro from the custom gcode block we created in Step 1 when the first extruder is intiated for a print. <img src="https://uploads.namegoeshere.net/u/IVaxYF.png">
+   - Click the `Machine G-code` tab and then inside the `Machine start G-code` block scroll down about 80%, you are looking for the line that says `BED_MESH_CALIBRATE PROBE_COUNT`.
+   - Below the `BED_MESH_CALIBRATE PROBE_COUNT` line add `START_SPOOLMAN_TRACKING`, this will invoke the `START_SPOOLMAN_TRACKING` gcode macro from the custom gcode block we created in Step 1. <img src="https://uploads.namegoeshere.net/u/GOek0I.png">
    - Scroll down to the `Change filament G-code` block and look for a line that says `"USE_CHANNEL CHANNEL=" + next_extruder + "`
    - Delete the `"USE_CHANNEL CHANNEL=" + next_extruder + "` line and the line immediately below it (two lines highlighted in the screenshot). <img src="https://uploads.namegoeshere.net/u/F76xMC.png">
 8. Save the new machine profile. NOTE: you will have to use this profile for the script to work.
