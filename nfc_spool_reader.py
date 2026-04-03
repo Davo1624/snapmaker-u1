@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import json
 import logging
 import os
@@ -10,7 +12,7 @@ import requests
 
 KLIPPY_LOG = "/home/lava/printer_data/logs/klippy.log"
 MOONRAKER_GCODE_URL = "http://127.0.0.1:7125/printer/gcode/script"
-SPOOLMAN_API_BASE = "http://poolman-ip:port/api/v1"
+SPOOLMAN_API_BASE = "http://spoolman-ip:port/api/v1" #replace with your actual spoolman url
 
 POLL_INTERVAL = 0.25
 REQUEST_TIMEOUT = 30
@@ -22,8 +24,11 @@ EVENT_MAX_LINES = 120
 EVENT_MAX_AGE_SECONDS = 10.0
 ASSIGNMENT_RETRY_INTERVAL = 5.0
 
+LOG_LEVEL = os.getenv("NFC_SPOOL_READER_LOG_LEVEL", "INFO").upper()
+LOG_RAW_LINES = os.getenv("NFC_SPOOL_READER_LOG_RAW_LINES", "0") == "1"
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="%(asctime)s %(levelname)s %(message)s",
 )
 logger = logging.getLogger("nfc_spool_reader")
@@ -73,7 +78,10 @@ class Deduper:
 
     def is_duplicate(self, key: str) -> bool:
         now = time.time()
-        self._seen = {k: ts for k, ts in self._seen.items() if now - ts <= self.ttl_seconds}
+        self._seen = {
+            k: ts for k, ts in self._seen.items()
+            if now - ts <= self.ttl_seconds
+        }
         if key in self._seen:
             return True
         self._seen[key] = now
@@ -89,6 +97,12 @@ class MoonrakerClient:
     def set_channel_spool(self, channel: int, spool_id: int) -> bool:
         script = f"SET_CHANNEL_SPOOL CHANNEL={channel} ID={spool_id}"
         logger.info("Sending gcode: %s", script)
+        logger.debug(
+            "POST %s payload=%r timeout=%s",
+            self.gcode_url,
+            {"script": script},
+            self.timeout,
+        )
         try:
             resp = self.session.post(
                 self.gcode_url,
@@ -96,6 +110,8 @@ class MoonrakerClient:
                 timeout=self.timeout,
             )
             resp.raise_for_status()
+            logger.info("Moonraker accepted gcode: %s", script)
+            logger.debug("Moonraker response status=%s", resp.status_code)
             return True
         except requests.exceptions.Timeout:
             logger.warning("Timed out sending gcode: %s", script)
@@ -113,13 +129,18 @@ class SpoolmanClient:
 
     def spool_exists(self, spool_id: int) -> bool:
         url = f"{self.base_url}/spool/{spool_id}"
+        logger.debug("Checking Spoolman spool_id=%s at %s", spool_id, url)
         try:
             resp = self.session.get(url, timeout=self.timeout)
             if resp.status_code == 200:
+                logger.debug("Spoolman confirmed spool_id=%s", spool_id)
                 return True
             logger.warning(
                 "Spool lookup failed: spool_id=%s url=%s status=%s body=%r",
-                spool_id, url, resp.status_code, resp.text[:300],
+                spool_id,
+                url,
+                resp.status_code,
+                resp.text[:300],
             )
             return False
         except requests.exceptions.RequestException:
@@ -142,6 +163,7 @@ class KlippyLogWatcher:
         if self.start_at_end:
             self.fp.seek(0, os.SEEK_END)
         logger.info("Watching log: %s", self.path)
+        logger.debug("start_at_end=%s", self.start_at_end)
 
     def reopen_if_rotated(self) -> None:
         if self.fp is None:
@@ -158,12 +180,20 @@ class KlippyLogWatcher:
             time.sleep(1)
 
     def _expire_event_if_needed(self) -> None:
-        if self.current_event and self.current_event.is_expired(self.line_no, time.monotonic()):
+        if self.current_event and self.current_event.is_expired(
+            self.line_no, time.monotonic()
+        ):
+            logger.debug(
+                "Expiring incomplete NFC event at line=%s channel=%r",
+                self.line_no,
+                self.current_event.channel,
+            )
             self.current_event = None
 
     def _ensure_event(self) -> None:
         if self.current_event is None:
             self.current_event = PendingScanEvent(self.line_no, time.monotonic())
+            logger.debug("Created pending scan event at line=%s", self.line_no)
 
     @staticmethod
     def _extract_channel(line: str) -> Optional[int]:
@@ -190,16 +220,22 @@ class KlippyLogWatcher:
 
             self.line_no += 1
             line = line.rstrip("\n")
+
+            if LOG_RAW_LINES:
+                logger.debug("LOG LINE: %s", line)
+
             self._expire_event_if_needed()
 
             if NTAG_READ_RE.search(line):
                 self.current_event = PendingScanEvent(self.line_no, time.monotonic())
+                logger.info("Detected NFC read event")
                 continue
 
             channel = self._extract_channel(line)
             if channel is not None:
                 self._ensure_event()
                 self.current_event.channel = channel
+                logger.debug("Detected channel assignment from log: channel=%s", channel)
                 continue
 
             json_match = OPEN_SPOOL_JSON_RE.search(line)
@@ -222,6 +258,7 @@ class KlippyLogWatcher:
                 record.channel,
                 record.spool_id,
             )
+            logger.debug("Payload contents: %s", record.payload)
             results.append(record)
             self.current_event = None
 
@@ -242,6 +279,7 @@ class PendingAssignments:
                 channel,
                 spool_id,
             )
+            logger.debug("Pending assignments: %r", self._pending)
             return
 
         self._pending[channel] = {
@@ -250,14 +288,18 @@ class PendingAssignments:
             "last_attempt_at": 0.0,
         }
         logger.info("Queued assignment: channel %s -> spool %s", channel, spool_id)
+        logger.debug("Pending assignments: %r", self._pending)
 
     def ready(self, retry_interval: float) -> List[tuple[int, int]]:
         now = time.monotonic()
-        return [
+        ready_items = [
             (channel, int(item["spool_id"]))
             for channel, item in self._pending.items()
             if now - item["last_attempt_at"] >= retry_interval
         ]
+        if ready_items:
+            logger.debug("Assignments ready for retry: %r", ready_items)
+        return ready_items
 
     def mark_attempt(self, channel: int) -> None:
         if channel in self._pending:
@@ -267,7 +309,12 @@ class PendingAssignments:
         item = self._pending.get(channel)
         if item and int(item["spool_id"]) == spool_id:
             self._pending.pop(channel, None)
-            logger.info("Assignment applied successfully: channel %s -> spool %s", channel, spool_id)
+            logger.info(
+                "Assignment applied successfully: channel %s -> spool %s",
+                channel,
+                spool_id,
+            )
+            logger.debug("Pending assignments after success: %r", self._pending)
 
     def has_pending(self) -> bool:
         return bool(self._pending)
@@ -303,12 +350,18 @@ class NFCSpoolReaderApp:
             return
 
         for channel, spool_id in self.pending_assignments.ready(ASSIGNMENT_RETRY_INTERVAL):
+            logger.debug(
+                "Attempting assignment channel=%s spool_id=%s",
+                channel,
+                spool_id,
+            )
             self.pending_assignments.mark_attempt(channel)
             if self.moonraker.set_channel_spool(channel, spool_id):
                 self.pending_assignments.mark_success(channel, spool_id)
             else:
                 logger.warning(
-                    "Moonraker busy/unavailable, keeping pending assignment channel=%s spool_id=%s for retry",
+                    "Moonraker busy/unavailable, keeping pending assignment "
+                    "channel=%s spool_id=%s for retry",
                     channel,
                     spool_id,
                 )
@@ -324,15 +377,26 @@ class NFCSpoolReaderApp:
             try:
                 for record in self.watcher.poll():
                     self.handle_record(record)
+
                 self.flush_pending_assignments()
+
             except Exception:
-                logger.exception("Watcher loop error")
+                logger.exception("Watcher loop error - continuing")
 
             time.sleep(POLL_INTERVAL)
 
 
 def main() -> None:
-    NFCSpoolReaderApp().run()
+    logger.info("Starting NFC Spool Reader")
+    try:
+        NFCSpoolReaderApp().run()
+    except KeyboardInterrupt:
+        logger.warning("NFC Spool Reader interrupted by user")
+    except Exception:
+        logger.exception("Fatal error in NFC Spool Reader")
+        raise
+    finally:
+        logger.info("NFC Spool Reader shutting down")
 
 
 if __name__ == "__main__":
